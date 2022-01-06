@@ -1,6 +1,8 @@
 /**
  * Original Author: Tustin & 0x199
  * Original github: https://github.com/Tustin/pkg-merge
+ *
+ * g++ -std=c++17 -o pkg-merge.exe main.cpp
  */
 
 #include <cstdio>
@@ -12,10 +14,29 @@
 #include <list>
 #include <cassert>
 #include <vector>
+#include <cstring>
 
-using namespace std;
+//#ifdef _WIN32
+//    #include <tchar.h>
+//    #include <filesystem>
+//    namespace fs = std::filesystem;
+//#elif _WIN64
+//    #include <tchar.h>
+//    #include <filesystem>
+//    namespace fs = std::filesystem;
+//#elif __APPLE__ || __MACH__
+//    #include <filesystem>
+//    namespace fs = std::filesystem;
+//#elif __linux__
+//    #include <filesystem>
+//    namespace fs = std::filesystem;
+//#elif __unix || __unix__
+//    #include <filesystem>
+//    namespace fs = std::filesystem;
+//#endif
 
 namespace fs = std::filesystem;
+
 using std::string;
 using std::map;
 using std::vector;
@@ -43,6 +64,24 @@ struct cmpSort {
 
 const char PKG_MAGIC[4] = { 0x7F, 0x43, 0x4E, 0x54 };
 
+//std::string getOsName() {
+//#ifdef _WIN32
+//    return "Win";
+//#elif _WIN64
+//    return "Win";
+//#elif __APPLE__ || __MACH__
+//    return "Mac";
+//#elif __linux__
+//    return "Linux";
+//#elif __FreeBSD__
+//    return "FreeBSD";
+//#elif __unix || __unix__
+//    return "Unix";
+//#else
+//    return "Other";
+//#endif
+//}
+
 void merge(map<string, Package> packages) {
     for (auto & root : packages) {
         auto pkg = root.second;
@@ -56,7 +95,13 @@ void merge(map<string, Package> packages) {
         printf("[work] beginning to merge %d %s for package %s...\n", pieces, pieces == 1 ? "piece" : "pieces", title_id);
 
         string merged_file_name = root.first + "-merged.pkg";
-        string full_merged_file = pkg.file.parent_path().string() + "/" + merged_file_name;
+        // string full_merged_file = pkg.file.parent_path().string() + "\\" + merged_file_name;
+
+        // fs::path dir (pkg.file.parent_path().string());
+        fs::path file (merged_file_name);
+
+        fs::path _full_merged_file = pkg.file.parent_path() / file;
+        string full_merged_file = _full_merged_file.string();
 
         if (fs::exists(full_merged_file)) {
             fs::remove(full_merged_file);
@@ -66,9 +111,7 @@ void merge(map<string, Package> packages) {
         auto merged_file = fs::path(full_merged_file);
 
         // Deal with root file first
-        auto a = pkg.file.string();
-        auto b = merged_file.string();
-        fs::copy_file(a, b, fs::copy_options::update_existing);
+        fs::copy_file(pkg.file, merged_file, fs::copy_options::update_existing);
         printf("done\n");
 
         // Using C API from here on because it just works and is fast
@@ -107,8 +150,10 @@ int main(int argc, char *argv[]) {
     }
     string dir = argv[1];
 #else
-    string dir = "/Users/aldo/CLionProjects/pkg-merge/doom/";
+    string dir = "//doom/";
 #endif // !_DEBUG
+
+    // string dir = "/Users/aldo/Desktop/pkg-merge/doom/";
 
     if (!fs::is_directory(dir)) {
         printf("[error] argument '%s' is not a directory\n", dir.c_str());
@@ -118,7 +163,9 @@ int main(int argc, char *argv[]) {
     map<string, Package> packages;
     map<int, Files, cmpSort> files;
 
-    for (auto & file : fs::directory_iterator(dir)) { // fs::directory_iterator(dir)
+    printf("Reading files...");
+
+    for (auto & file : fs::directory_iterator(dir)) {
         string file_name = file.path().filename().string();
 
         if (file.path().extension() != ".pkg") {
@@ -139,24 +186,27 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        // Check if it's root PKG
-        if(pkg_piece == 0){
-            std::ifstream ifs(file, std::ios::binary);
-            char magic[4];
-            ifs.read(magic, sizeof(magic));
-            ifs.close();
-
-            if (memcmp(magic, PKG_MAGIC, sizeof(PKG_MAGIC)) != 0) {
-                printf("[warn] assumed root PKG file '%s' doesn't match PKG magic (is %s, wants %s). skipping...\n", file_name.c_str(), magic, PKG_MAGIC);
-                continue;
-            }
-        }
+        /**
+         * TODO: This throws compile error on Windows. Not sure why.
+         * Check if it's root PKG
+         */
+//        if(pkg_piece == 0){
+//            std::ifstream ifs(file, std::ios::binary);
+//            char magic[4];
+//            ifs.read(magic, sizeof(magic));
+//            ifs.close();
+//
+//            if (memcmp(magic, PKG_MAGIC, sizeof(PKG_MAGIC)) != 0) {
+//                printf("[warn] assumed root PKG file '%s' doesn't match PKG magic (is %s, wants %s). skipping...\n", file_name.c_str(), magic, PKG_MAGIC);
+//                continue;
+//            }
+//        }
 
         auto _file = Files();
         _file.part = (int)pkg_piece;
         _file.file = file.path();
         _file.title_id = title_id;
-        files.insert(pair<int, Files>(pkg_piece, _file));
+        files.insert(std::pair<int, Files>(pkg_piece, _file));
     }
 
     // Add files to Package struct like before.
@@ -164,7 +214,8 @@ int main(int argc, char *argv[]) {
         if(file.first == 0) {
             auto package = Package();
             package.part = 0;
-            package.file = fs::path("/" + file.second.file.relative_path().string());
+            // package.file = fs::path(path + file.second.file.relative_path().string());
+            package.file = (fs::path(dir) / file.second.file.filename()).string();
             packages.insert(std::pair<string, Package>(file.second.title_id, package));
 
             continue;
@@ -174,12 +225,15 @@ int main(int argc, char *argv[]) {
 
         auto pkg = &it->second;
         auto piece = Package();
-        piece.file = fs::path("/" + file.second.file.relative_path().string());
+        // piece.file = fs::path(path + file.second.file.relative_path().string());
+        piece.file = (fs::path(dir) / file.second.file.filename()).string();
         piece.part = file.first;
         pkg->parts.push_back(piece);
     }
 
     merge(packages);
     printf("\n[success] completed\n");
+    std::cin.get();
+    std::cin.get();
     return 0;
 }

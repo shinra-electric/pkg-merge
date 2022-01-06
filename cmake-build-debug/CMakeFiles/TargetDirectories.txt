@@ -1,0 +1,3 @@
+/Users/aldo/Desktop/pkg-merge/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/Users/aldo/Desktop/pkg-merge/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/aldo/Desktop/pkg-merge/cmake-build-debug/CMakeFiles/pkg_merge.dir

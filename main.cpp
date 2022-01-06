@@ -1,8 +1,6 @@
 /**
  * Original Author: Tustin & 0x199
  * Original github: https://github.com/Tustin/pkg-merge
- *
- * g++ -std=c++17 -o pkg-merge.exe main.cpp
  */
 
 #include <cstdio>
@@ -15,25 +13,6 @@
 #include <cassert>
 #include <vector>
 #include <cstring>
-
-//#ifdef _WIN32
-//    #include <tchar.h>
-//    #include <filesystem>
-//    namespace fs = std::filesystem;
-//#elif _WIN64
-//    #include <tchar.h>
-//    #include <filesystem>
-//    namespace fs = std::filesystem;
-//#elif __APPLE__ || __MACH__
-//    #include <filesystem>
-//    namespace fs = std::filesystem;
-//#elif __linux__
-//    #include <filesystem>
-//    namespace fs = std::filesystem;
-//#elif __unix || __unix__
-//    #include <filesystem>
-//    namespace fs = std::filesystem;
-//#endif
 
 namespace fs = std::filesystem;
 
@@ -63,24 +42,6 @@ struct cmpSort {
 };
 
 const char PKG_MAGIC[4] = { 0x7F, 0x43, 0x4E, 0x54 };
-
-//std::string getOsName() {
-//#ifdef _WIN32
-//    return "Win";
-//#elif _WIN64
-//    return "Win";
-//#elif __APPLE__ || __MACH__
-//    return "Mac";
-//#elif __linux__
-//    return "Linux";
-//#elif __FreeBSD__
-//    return "FreeBSD";
-//#elif __unix || __unix__
-//    return "Unix";
-//#else
-//    return "Other";
-//#endif
-//}
 
 void merge(map<string, Package> packages) {
     for (auto & root : packages) {
@@ -152,8 +113,6 @@ int main(int argc, char *argv[]) {
 #else
     string dir = "//doom/";
 #endif // !_DEBUG
-
-    // string dir = "/Users/aldo/Desktop/pkg-merge/doom/";
 
     if (!fs::is_directory(dir)) {
         printf("[error] argument '%s' is not a directory\n", dir.c_str());
@@ -233,7 +192,5 @@ int main(int argc, char *argv[]) {
 
     merge(packages);
     printf("\n[success] completed\n");
-    std::cin.get();
-    std::cin.get();
     return 0;
 }

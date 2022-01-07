@@ -1,6 +1,9 @@
 /**
  * Original Author: Tustin & 0x199
  * Original github: https://github.com/Tustin/pkg-merge
+ *
+ * Libraries:
+ *      - https://github.com/btzy/nativefiledialog-extended
  */
 
 #include <cstdio>
@@ -13,6 +16,9 @@
 #include <cassert>
 #include <vector>
 #include <cstring>
+#include <nfd.h>
+
+using namespace std;
 
 namespace fs = std::filesystem;
 
@@ -21,18 +27,19 @@ using std::map;
 using std::vector;
 
 struct Package {
-    int					part;
-    fs::path			file;
-    vector<Package>		parts;
-    bool operator < (const Package& rhs) const {
+    int part;
+    fs::path file;
+    vector<Package> parts;
+
+    bool operator<(const Package &rhs) const {
         return part < rhs.part;
     }
 };
 
 struct Files {
-    int					part;
-    string              title_id;
-    fs::path			file;
+    int part;
+    string title_id;
+    fs::path file;
 };
 
 struct cmpSort {
@@ -41,10 +48,10 @@ struct cmpSort {
     }
 };
 
-const char PKG_MAGIC[4] = { 0x7F, 0x43, 0x4E, 0x54 };
+const char PKG_MAGIC[4] = {0x7F, 0x43, 0x4E, 0x54};
 
 void merge(map<string, Package> packages) {
-    for (auto & root : packages) {
+    for (auto &root: packages) {
         auto pkg = root.second;
 
         // Before we start, we need to sort the lists properly
@@ -53,13 +60,14 @@ void merge(map<string, Package> packages) {
         size_t pieces = pkg.parts.size();
         auto title_id = root.first.c_str();
 
-        printf("[work] beginning to merge %d %s for package %s...\n", pieces, pieces == 1 ? "piece" : "pieces", title_id);
+        printf("[work] beginning to merge %d %s for package %s...\n", pieces, pieces == 1 ? "piece" : "pieces",
+               title_id);
 
         string merged_file_name = root.first + "-merged.pkg";
         // string full_merged_file = pkg.file.parent_path().string() + "\\" + merged_file_name;
 
         // fs::path dir (pkg.file.parent_path().string());
-        fs::path file (merged_file_name);
+        fs::path file(merged_file_name);
 
         fs::path _full_merged_file = pkg.file.parent_path() / file;
         string full_merged_file = _full_merged_file.string();
@@ -79,7 +87,7 @@ void merge(map<string, Package> packages) {
         FILE *merged = fopen(full_merged_file.c_str(), "a+b");
 
         // Now all the pieces...
-        for (auto & part : pkg.parts) {
+        for (auto &part: pkg.parts) {
             FILE *to_merge = fopen(part.file.string().c_str(), "r+b");
 
             auto total_size = fs::file_size(part.file);
@@ -88,12 +96,12 @@ void merge(map<string, Package> packages) {
             uintmax_t copied = 0;
 
             size_t read_data;
-            while ((read_data = fread(buffer, sizeof(char), sizeof(buffer), to_merge)) > 0)
-            {
+            while ((read_data = fread(buffer, sizeof(char), sizeof(buffer), to_merge)) > 0) {
                 fwrite(buffer, sizeof(char), read_data, merged);
                 copied += read_data * sizeof(char);
-                auto percentage = ((double)copied / (double)total_size) * 100;
-                printf("\r\t[work] merged %llu/%llu bytes (%.0lf%%) for part %d...", copied, total_size, percentage, part.part);
+                auto percentage = ((double) copied / (double) total_size) * 100;
+                printf("\r\t[work] merged %llu/%llu bytes (%.0lf%%) for part %d...", copied, total_size, percentage,
+                       part.part);
             }
             fclose(to_merge);
 
@@ -104,15 +112,45 @@ void merge(map<string, Package> packages) {
 }
 
 int main(int argc, char *argv[]) {
-#ifndef _DEBUG
-    if (argc != 2) {
-        std::cout << "No pkg directory supplied\nUsage: pkg-merge.exe <directory>" << std::endl;
-        return 1;
-    }
-    string dir = argv[1];
-#else
-    string dir = "//doom/";
-#endif // !_DEBUG
+    //////////////////////////////////
+    string dir;
+
+    if (argc < 2) {
+        // Open dialog
+        NFD_Init();
+
+        nfdnchar_t *outPath;
+        nfdresult_t result = NFD_PickFolderN(&outPath, NULL);
+
+        if (result == NFD_OKAY) {
+            puts("Success!");
+            // puts(outPath);
+
+            // I don't know why we need to use wstring for Windows but not for MacOS. Not tested for Linux.
+#ifdef _WIN32
+            wstring ws(outPath);
+            string _dir(ws.begin(), ws.end());
+            dir = _dir;
+#elif _WIN64
+            wstring ws(outPath);
+            string _dir(ws.begin(), ws.end());
+            dir = _dir;
+#elif __APPLE__ || __MACH__
+            dir = outPath;
+#elif __linux__ || __unix || __unix__
+            dir = outPath;
+#endif
+            NFD_FreePathN(outPath);
+        } else if (result == NFD_CANCEL) {
+            puts("User pressed cancel.");
+            return 1;
+        } else {
+            printf("Error: %s\n", NFD_GetError());
+            return 1;
+        }
+
+        NFD_Quit();
+    } else dir = argv[1];
 
     if (!fs::is_directory(dir)) {
         printf("[error] argument '%s' is not a directory\n", dir.c_str());
@@ -122,9 +160,9 @@ int main(int argc, char *argv[]) {
     map<string, Package> packages;
     map<int, Files, cmpSort> files;
 
-    printf("Reading files...");
+    printf("Reading files...\n");
 
-    for (auto & file : fs::directory_iterator(dir)) {
+    for (auto &file: fs::directory_iterator(dir)) {
         string file_name = file.path().filename().string();
 
         if (file.path().extension() != ".pkg") {
@@ -138,7 +176,7 @@ int main(int argc, char *argv[]) {
         size_t found_part_end = file_name.find_first_of(".");
         string part = file_name.substr(found_part_begin, found_part_end - found_part_begin);
         string title_id = file_name.substr(0, found_part_begin - 1);
-        char* ptr = NULL;
+        char *ptr = NULL;
         auto pkg_piece = strtol(part.c_str(), &ptr, 10);
         if (ptr == NULL) {
             printf("[warn] '%s' is not a valid piece (fails integer conversion). skipping...\n", part.c_str());
@@ -162,15 +200,15 @@ int main(int argc, char *argv[]) {
 //        }
 
         auto _file = Files();
-        _file.part = (int)pkg_piece;
+        _file.part = (int) pkg_piece;
         _file.file = file.path();
         _file.title_id = title_id;
         files.insert(std::pair<int, Files>(pkg_piece, _file));
     }
 
     // Add files to Package struct like before.
-    for (auto & file : files) {
-        if(file.first == 0) {
+    for (auto &file: files) {
+        if (file.first == 0) {
             auto package = Package();
             package.part = 0;
             // package.file = fs::path(path + file.second.file.relative_path().string());

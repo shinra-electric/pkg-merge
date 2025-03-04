@@ -32,11 +32,11 @@ jobs:
         run: make -C build
 
       - name: Sign the app
-        run: codesign --sign - --force --deep pkg-merge/build/pkg-merge
+        run: codesign --sign - --force --deep build/pkg_merge
 
       - name: Upload artifacts - macOS
         uses: actions/upload-artifact@v4
         with:
           name: pkg-merge-darwin-aarch64
-          path: pkg-merge/build/pkg-merge
+          path: build/pkg_merge
           if-no-files-found: error

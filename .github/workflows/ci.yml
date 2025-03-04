@@ -1,0 +1,42 @@
+name: Build for Apple Silicon
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    name: Build Apple Silicon executable
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies and configure environment
+        run: |
+          export HOMEBREW_NO_INSTALL_CLEANUP=1
+          export HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1
+          brew update
+          brew install cmake
+
+      - name: Configure
+        run: cmake . -B build 
+
+      - name: Build
+        run: make -C build
+
+      - name: Sign the app
+        run: codesign --sign - --force --deep build/pkg_merge
+
+      - name: Upload artifacts - macOS
+        uses: actions/upload-artifact@v4
+        with:
+          name: pkg-merge-darwin-aarch64
+          path: build/pkg_merge
+          if-no-files-found: error

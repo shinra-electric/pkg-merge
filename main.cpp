@@ -189,6 +189,10 @@ int main(int argc, char *argv[]) {
         NFD_Quit();
     }
 
+    if (out_dir.empty()) {
+        out_dir = dir;
+    }
+
     if (!fs::is_directory(dir)) {
         printf("[error] argument '%s' is not a directory\n", dir.c_str());
         return 1;

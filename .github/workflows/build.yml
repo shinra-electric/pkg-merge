@@ -1,0 +1,45 @@
+name: macOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  macOS:
+    
+    strategy:
+      matrix:
+        include:
+            - runner: macos-latest
+              suffix: arm64
+            - runner: macos-13
+              suffix: x86
+    runs-on: ${{ matrix.runner}}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check CMake version
+        run: cmake --version
+
+      - name: Configure
+        run: cmake . -B build 
+
+      - name: Build
+        run: make -C build
+
+      - name: Sign the app
+        run: codesign --sign - --force --deep build/pkg_merge
+
+      - name: Upload artifacts - macOS
+        uses: actions/upload-artifact@v4
+        with:
+          name: pkg-merge-macOS-${{ matrix.suffix }}
+          path: build/pkg_merge
+          if-no-files-found: error

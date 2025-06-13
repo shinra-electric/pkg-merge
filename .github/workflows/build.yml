@@ -1,0 +1,82 @@
+name: macOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+    tags: [ 'v*' ]
+  pull_request:
+    paths: 
+      - '.github/workflows/build.yml'
+
+jobs:
+  build-macOS:
+    strategy:
+      matrix:
+        include:
+            - runner: macos-latest
+              suffix: arm64
+            - runner: macos-13
+              suffix: x86
+    runs-on: ${{ matrix.runner}}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check CMake version
+        run: cmake --version
+
+      - name: Configure
+        run: cmake . -B build-${{ matrix.suffix }}
+
+      - name: Build
+        run: |
+          make -C build
+
+      - name: Upload artifacts - macOS
+        uses: actions/upload-artifact@v4
+        with:
+          name: pkg-merge-macOS-${{ matrix.suffix }}
+          path: build-${{ matrix.suffix }}/pkg_merge
+          if-no-files-found: error
+
+  make-macOS-universal-binary:
+    name: macOS Universal Binary
+    needs: build-macOS
+    runs-on: macos-latest
+    
+    steps:
+      - name: Download Arm Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pkg-merge-macOS-arm64
+          path: build-arm64/pkg_merge
+
+      - name: Download x86 Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pkg-merge-macOS-x86
+          path: build-x86/pkg_merge
+
+      - name: Create Univeral Binary
+        run: |
+          mkdir bin
+          lipo -output bin/pkg_merge -create build-arm64/pkg_merge build-x86/pkg_merge
+          mv bin/pkg_merge pkg_merge
+          chmod +rxw pkg_merge
+          tar cv pkg_merge | gzip -9 > pkg_merge-macOS-Universal.tar.gz
+  
+      - name: Delete x86 and Arm builds
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: |
+            pkg-merge-macOS-x86
+            pkg-merge-macOS-arm64
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: pkg_merge-macOS-Universal
+          path: pkg_merge-macOS-Universal.tar.gz

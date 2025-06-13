@@ -3,10 +3,18 @@ name: macOS
 on:
   workflow_dispatch:
   push:
-    branches: [ master ]
-    tags: [ 'v*' ]
+    paths:
+      - '**'
+      - '!.github/**'
+      - '.github/workflows/build.yml'
+      - '!**.md'
+  
   pull_request:
-    branches: [ master ]
+    paths:
+      - '**'
+      - '!.github/**'
+      - '.github/workflows/build.yml'
+      - '!**.md'
 
 jobs:
   build-macOS:
@@ -32,7 +40,7 @@ jobs:
 
       - name: Build
         run: |
-          make -C build
+          make -C build-${{ matrix.suffix }}
 
       - name: Upload artifacts - macOS
         uses: actions/upload-artifact@v4
@@ -51,13 +59,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: pkg-merge-macOS-arm64
-          path: build-arm64/pkg_merge
+          path: build-arm64
 
       - name: Download x86 Artifact
         uses: actions/download-artifact@v4
         with:
           name: pkg-merge-macOS-x86
-          path: build-x86/pkg_merge
+          path: build-x86
 
       - name: Create Univeral Binary
         run: |
